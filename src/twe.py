@@ -84,13 +84,13 @@ class Options(object):
         self.learning_rate = 0.001
 
         # Number of negative samples per example.
-        self.nneg = 3
+        self.nneg = 2
 
         # Concurrent training steps.
         self.concurrent_steps = 6
 
         # Number of examples for one training step.
-        self.batch_size = 100
+        self.batch_size = 1000
         
         self.epoch_size = 100000
 
@@ -520,7 +520,7 @@ class TempWordEmb(object):
         return {"len": i, "cnts": cnts, "probs": probs}
 
 
-    def train(self):
+    def train(self, epoch):
         opts = self._options
 
         summary_op = tf.merge_all_summaries()
@@ -528,25 +528,30 @@ class TempWordEmb(object):
         workers = []
 
         batch, labels, time = self.generate_batch(opts.train_data)
-        for i in range(len(batch) // 100):
-            feed_dict={self.train_inputs: batch[i*100:(i+1)*100], 
-                self.train_labels: labels[i*100:(i+1)*100],
-                self.train_inputs_time: time[i*100:(i+1)*100],
+        for i in range(len(batch) // 1000):
+            feed_dict={self.train_inputs: batch[i*1000:(i+1)*1000], 
+                self.train_labels: labels[i*1000:(i+1)*1000],
+                self.train_inputs_time: time[i*1000:(i+1)*1000],
                 self.cent_word: self._cent_word,
                 self.cent_cntx: self._cent_cntx}
 
-        self._session.run([self._train], feed_dict)
+            self._session.run([self._train], feed_dict)
+            if i % 10 == 0:
+                summary_str = self._session.run(summary_op, feed_dict)
+                summary_writer.add_summary(summary_str, epoch * 100 + i)
+
+
 
         summary_str = self._session.run(summary_op, feed_dict)
-        summary_writer.add_summary(summary_str, 0)
+        summary_writer.add_summary(summary_str, epoch)
 
     def optimize(self, loss):
         """Build the graph to optimize the loss function."""
+        opts = self._options
 
         # Optimizer nodes.
         # Linear learning rate decay.
-        self._lr = 0.001
-        optimizer = tf.train.GradientDescentOptimizer(self._lr)
+        optimizer = tf.train.AdamOptimizer(opts.learning_rate, epsilon=1e-4)
         train = optimizer.minimize(loss, gate_gradients=optimizer.GATE_NONE)
         self._train = train
 
@@ -572,7 +577,9 @@ def main(_):
     with tf.Graph().as_default(), tf.Session() as session:
         with tf.device("/cpu:0"):
             twe = TempWordEmb(opts, session)
-            twe.train()
+            for i in range(opts.nepochs):
+                print("Start epoch: {}".format(i))
+                twe.train(i)
             print("fdsfsdf")
 
 
