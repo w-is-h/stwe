@@ -65,20 +65,20 @@ class Options(object):
         self.end_time = 1041375600
 
         # Number of clusters to train
-        self.nclst = 1000
+        self.nclst = 200
 
         # Time constant for cluster influence
-        self.tau = 1e-5
+        self.tau = 1e-7
 
         # Number of clusters left and right to consider when calculating updates
-        self.clst_window = 100
+        self.clst_window = 50
 
         # Embedding dimension.
         self.emb_dim = 100
 
         # Number of epochs to train. After these many epochs, the learning
         # rate decays linearly to zero and the training stops.
-        self.nepochs = 10
+        self.nepochs = 100
 
         # The initial learning rate.
         self.learning_rate = 0.001
@@ -90,15 +90,15 @@ class Options(object):
         self.concurrent_steps = 6
 
         # Number of examples for one training step.
-        self.batch_size = 1000
+        self.batch_size = 100
         
         self.epoch_size = 100000
 
         # The number of words to predict to the left and right of the target word.
-        self.window_size = 8
+        self.window_size = 20
 
         # Given one sample the maximum number of words (a, b) to take. 
-        self.max_pairs_from_sample = 30
+        self.max_pairs_from_sample = 100
 
         # Maximum number of (a, b) pairs from one sample, where the target 'b' is the same word
         self.max_same_target = 10
@@ -528,22 +528,18 @@ class TempWordEmb(object):
         workers = []
 
         batch, labels, time = self.generate_batch(opts.train_data)
-        for i in range(len(batch) // 1000):
-            feed_dict={self.train_inputs: batch[i*1000:(i+1)*1000], 
-                self.train_labels: labels[i*1000:(i+1)*1000],
-                self.train_inputs_time: time[i*1000:(i+1)*1000],
+        for i in range(opts.epoch_size // opts.batch_size):
+            feed_dict={self.train_inputs: batch[i*opts.batch_size:(i+1)*opts.batch_size], 
+                self.train_labels: labels[i*opts.batch_size:(i+1)*opts.batch_size],
+                self.train_inputs_time: time[i*opts.batch_size:(i+1)*opts.batch_size],
                 self.cent_word: self._cent_word,
                 self.cent_cntx: self._cent_cntx}
 
             self._session.run([self._train], feed_dict)
-            if i % 10 == 0:
+            if (i * opts.batch_size) % 10000 == 0:
                 summary_str = self._session.run(summary_op, feed_dict)
-                summary_writer.add_summary(summary_str, epoch * 100 + i)
-
-
-
-        summary_str = self._session.run(summary_op, feed_dict)
-        summary_writer.add_summary(summary_str, epoch)
+                summary_writer.add_summary(summary_str, epoch * opts.epoch_size + i*opts.batch_size)
+        
 
     def optimize(self, loss):
         """Build the graph to optimize the loss function."""
