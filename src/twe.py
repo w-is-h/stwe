@@ -3,6 +3,8 @@ import operator
 import tensorflow as tf
 from gensim.models import Word2Vec
 from io_utils import DocumentTimePair
+from queue import Queue
+from threading import Thread
 
 """
 flags = tf.app.flags
@@ -58,39 +60,42 @@ class Options(object):
         self.train_data = "../data/final.txt"
 
         # The testing text file.
-        self.test_data = ""
+        self.test_data = "../data/final.txt"
 
         # Timestamp for the first and last document (training data)
         self.start_time = 536454000
+        self._start_time = 536454000
         self.end_time = 1041375600
+        self._end_time = 1041375600
+        self.time_transform = 2592000
 
         # Number of clusters to train
         self.nclst = 200
 
         # Time constant for cluster influence
-        self.tau = 1e-7
+        self.tau = 3e-2
 
         # Number of clusters left and right to consider when calculating updates
-        self.clst_window = 50
+        self.clst_window = 30
 
         # Embedding dimension.
         self.emb_dim = 100
 
         # Number of epochs to train. After these many epochs, the learning
         # rate decays linearly to zero and the training stops.
-        self.nepochs = 100
+        self.nepochs = 10
 
         # The initial learning rate.
-        self.learning_rate = 0.001
+        self.learning_rate = 0.01
 
         # Number of negative samples per example.
         self.nneg = 2
 
         # Concurrent training steps.
-        self.concurrent_steps = 6
+        self.concurrent_steps = 8
 
         # Number of examples for one training step.
-        self.batch_size = 100
+        self.batch_size = 1000
         
         self.epoch_size = 100000
 
@@ -186,13 +191,23 @@ class Options(object):
 
 class TempWordEmb(object):
     def __init__(self, options, session):
+        # Used so that the testset is keept in memory
+        self._testset = None
         self._options = options
+        
+        if self._options.time_transform > 0:
+            self._options.start_time = 0
+            self._options.end_time = (self._options.end_time - self._options.start_time) / self._options.time_transform
+
         self._session = session
         self._word2id = {}
         self._id2word = []
         # Central and Context representations from word2vec
         self._cent_word = []
         self._cent_cntx = []
+
+        self._train_loss = 0
+        self._test_loss = 0
 
         self.build_graph()
 
@@ -211,10 +226,19 @@ class TempWordEmb(object):
 
         true_logits, sampled_logits = self.forward()
         loss = self.nce_loss(true_logits, sampled_logits)
-        tf.scalar_summary("NCE loss", loss)
 
         self._loss = loss
         self.optimize(loss)
+
+        # Variables for train and test loss
+        self.train_loss = tf.placeholder(tf.float32)
+        self.test_loss = tf.placeholder(tf.float32)
+        tf.scalar_summary("train_loss", self.train_loss)
+        tf.scalar_summary("test_loss", self.test_loss)
+
+        # Histogram for time
+        for i in range(opts.nclst):
+            tf.scalar_summary("clsttime_{}".format(i), tf.reshape(self.clst_time, [-1])[i])
 
         tf.initialize_all_variables().run()
         self.saver = tf.train.Saver()
@@ -257,8 +281,8 @@ class TempWordEmb(object):
         cntx_clst = tf.Variable(tf.random_uniform([opts.nclst, opts.emb_dim], -0.5, 0.5), name='cntx_clst')
 
         # clst_time - Timestamp for each cluster
-        clst_time = tf.Variable(tf.random_uniform([opts.nclst, 1], opts.start_time, opts.end_time, 
-            dtype=tf.int32), name='clst_time')
+        self.clst_time = tf.Variable(tf.random_uniform([opts.nclst, 1], opts.start_time, opts.end_time, 
+            dtype=tf.float32), name='clst_time')
 
         # Training data - [index_for_vector, time]
         self.train_inputs = tf.placeholder(tf.int32, shape=[opts.batch_size, 1], name='train_inputs')
@@ -267,7 +291,7 @@ class TempWordEmb(object):
         self.train_labels = tf.placeholder(tf.int32, shape=[opts.batch_size, 1], name='train_labels')
         train_labels = self.train_labels
         # Time for every pair (a, b)
-        self.train_inputs_time = tf.placeholder(tf.int32, shape=[opts.batch_size, 1])
+        self.train_inputs_time = tf.placeholder(tf.float32, shape=[opts.batch_size, 1])
         train_inputs_time = self.train_inputs_time
 
         # cent_word - Central representation for word representations
@@ -283,7 +307,7 @@ class TempWordEmb(object):
         rho_lup_cntx = tf.nn.embedding_lookup(rho, tf.reshape(train_inputs, [-1]))
 
         # Time difference between word and cluster time
-        t_ctime = tf.tile(clst_time, [opts.batch_size, 1])
+        t_ctime = tf.tile(self.clst_time, [opts.batch_size, 1])
         # Time for every word repated for number of clusters and flatened 
         t_wtime = tf.reshape(tf.tile(train_inputs_time, [1, opts.nclst]), [-1 ,1])
 
@@ -306,7 +330,7 @@ class TempWordEmb(object):
         t_a_cntx = tf.reshape(tf.tile(train_inputs, [1, opts.clst_window]), [-1])
         selected_emb_cntx = tf.nn.embedding_lookup(cent_cntx, t_a_cntx)
 
-        fc = tf.exp(tf.to_float( tf.reshape(selected_time_diff, [-1, 1]) ) * opts.tau)
+        fc = tf.exp(tf.reshape(tf.gather(self.clst_time, selected_time_diff_ind), [-1, 1]) * opts.tau)
         gc_cntx = selected_clst_cntx - selected_emb_cntx
 
         dynamic_repr_cntx = tf.reduce_sum( tf.reshape(gc_cntx * selected_rho_cntx * fc, 
@@ -391,10 +415,8 @@ class TempWordEmb(object):
         return true_logits, negative_logits
 
     def generate_fullbatch(self, data, dataset_name='test'):
-        data = DocumentTimePair(data)
-
-        # Generate a batch using all samples and all words from a sample
         opts = self._options
+        data = DocumentTimePair(data, opts.time_transform, opts._start_time)
         data_params = {}
 
         # Check do we already have the data length
@@ -408,6 +430,7 @@ class TempWordEmb(object):
         labels = []
         time = []
 
+        # Generate a batch using all samples and all words from a sample
         for example in data:
             t = example[0]
             tmp = example[1]
@@ -415,25 +438,29 @@ class TempWordEmb(object):
             #TODO: None or nothing
             doc = [w if w in self._word2id and (data_params['probs'][self._word2id[w]] >= 1 or 
                 data_params['probs'][self._word2id[w]] > np.random.rand()) else None for w in tmp]
-            for wid in np.random.choice(len(doc), len(doc), replace=False):
-                # Choose second word from the window around the first word
-                if doc[wid] is None:
-                    continue
-                for wid2 in np.arange(max(0,   np.random.randint(wid - opts.window_size, wid)),
-                        min(len(doc), np.random.randint(wid + 1, wid + opts.window_size + 2))):
-                    if doc[wid2] == doc[wid] or doc[wid2] is None:
-                        continue
-                    batch.append(self._word2id[doc[wid]])
-                    labels.append(self._word2id[doc[wid2]])
-                    time.append(t)
 
-        return batch, labels, time
+            if len(doc) > 0:
+                for wid in np.random.choice(len(doc), len(doc), replace=False):
+                    # Choose second word from the window around the first word
+                    if doc[wid] is None:
+                        continue
+                    for wid2 in np.arange(max(0,   np.random.randint(wid - opts.window_size, wid)),
+                            min(len(doc), np.random.randint(wid + 1, wid + opts.window_size + 2))):
+                        if doc[wid2] == doc[wid] or doc[wid2] is None:
+                            continue
+                        batch.append(self._word2id[doc[wid]])
+                        labels.append(self._word2id[doc[wid2]])
+                        time.append(t)
+        batch = np.reshape(np.array(batch), [-1, 1])
+        labels = np.reshape(np.array(labels), [-1, 1])
+        time = np.reshape(np.array(time), [-1, 1])
+
+        return batch, labels, time 
 
     def generate_batch(self, data, dataset_name='train'):
-        data = DocumentTimePair(data)
-
         opts = self._options
         data_params = {}
+        data = DocumentTimePair(data, opts.time_transform, opts._start_time)
 
         # Check do we already have the data length
         if hasattr(opts, dataset_name + '_data_params'):
@@ -519,8 +546,24 @@ class TempWordEmb(object):
 
         return {"len": i, "cnts": cnts, "probs": probs}
 
+    
+    def _thread_target(self, queue):
+        while True:
+            data = queue.get()
+            feed_dict={self.train_inputs: data[0], 
+                self.train_labels: data[1],
+                self.train_inputs_time: data[2],
+                self.cent_word: self._cent_word,
+                self.cent_cntx: self._cent_cntx,
+                self.train_loss: self._train_loss,
+                self.test_loss: self._test_loss}
 
-    def train(self, epoch):
+            _, _loss = self._session.run([self._train, self._loss], feed_dict)
+            queue.task_done()
+ 
+
+    def train2(self, epoch):
+        print("Train started")
         opts = self._options
 
         summary_op = tf.merge_all_summaries()
@@ -528,18 +571,85 @@ class TempWordEmb(object):
         workers = []
 
         batch, labels, time = self.generate_batch(opts.train_data)
+        loss = 0
+        #Make Queue
+        queue = Queue(maxsize=0)
+        for i in range(opts.epoch_size // opts.batch_size):
+            queue.put([batch[i*opts.batch_size:(i+1)*opts.batch_size],
+                labels[i*opts.batch_size:(i+1)*opts.batch_size],
+                time[i*opts.batch_size:(i+1)*opts.batch_size]])
+
+
+        for j in range(opts.concurrent_steps):
+            worker = Thread(target=self._thread_target, args=(queue,))
+            worker.setDaemon(True)
+            worker.start()
+
+        queue.join()
+
+        """
+        self._train_loss = loss
+        if epoch > 0:
+            summary_str = self._session.run(summary_op, feed_dict)
+            summary_writer.add_summary(summary_str, epoch)
+        """
+
+
+    def train(self, epoch):
+        print("Train started")
+        opts = self._options
+
+        summary_op = tf.merge_all_summaries()
+        summary_writer = tf.train.SummaryWriter(opts.save_path, self._session.graph)
+        workers = []
+
+        batch, labels, time = self.generate_batch(opts.train_data)
+        loss = 0
         for i in range(opts.epoch_size // opts.batch_size):
             feed_dict={self.train_inputs: batch[i*opts.batch_size:(i+1)*opts.batch_size], 
                 self.train_labels: labels[i*opts.batch_size:(i+1)*opts.batch_size],
                 self.train_inputs_time: time[i*opts.batch_size:(i+1)*opts.batch_size],
                 self.cent_word: self._cent_word,
-                self.cent_cntx: self._cent_cntx}
+                self.cent_cntx: self._cent_cntx,
+                self.train_loss: self._train_loss,
+                self.test_loss: self._test_loss}
 
-            self._session.run([self._train], feed_dict)
-            if (i * opts.batch_size) % 10000 == 0:
-                summary_str = self._session.run(summary_op, feed_dict)
-                summary_writer.add_summary(summary_str, epoch * opts.epoch_size + i*opts.batch_size)
+            _, _loss = self._session.run([self._train, self._loss], feed_dict)
+            if i == 0:
+                loss = _loss
+            else:
+                loss = (loss + _loss) / 2
+
+        self._train_loss = loss
+        if epoch > 0:
+            summary_str = self._session.run(summary_op, feed_dict)
+            summary_writer.add_summary(summary_str, epoch)
+
         
+    def test(self, epoch):
+        print("Test started")
+        opts = self._options
+
+        workers = []
+        
+        if self._testset is None:
+            self._testset = self.generate_batch(opts.test_data)
+        batch, labels, time = self._testset
+        loss = 0
+        for i in range(len(batch) // opts.batch_size):
+            feed_dict={self.train_inputs: batch[i*opts.batch_size:(i+1)*opts.batch_size], 
+                self.train_labels: labels[i*opts.batch_size:(i+1)*opts.batch_size],
+                self.train_inputs_time: time[i*opts.batch_size:(i+1)*opts.batch_size],
+                self.cent_word: self._cent_word,
+                self.cent_cntx: self._cent_cntx,
+                self.train_loss: self._train_loss,
+                self.test_loss: self._test_loss}
+
+            if i == 0:
+                loss = self._session.run(self._loss, feed_dict)
+            else:
+                loss = (loss + self._session.run(self._loss, feed_dict)) / 2
+        self._test_loss = loss
 
     def optimize(self, loss):
         """Build the graph to optimize the loss function."""
@@ -574,8 +684,9 @@ def main(_):
         with tf.device("/cpu:0"):
             twe = TempWordEmb(opts, session)
             for i in range(opts.nepochs):
-                print("Start epoch: {}".format(i))
+                print("Started epoch: {}".format(i))
+                #twe.test(i)
                 twe.train(i)
-            print("fdsfsdf")
+            print("--------DONE-------")
 
 
