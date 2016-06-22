@@ -1,0 +1,93 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage{amsmath}
+\usepackage{colortbl}
+\usepackage{color}
+
+\title{Report}
+\author{Zeljko Kraljevic}
+
+\begin{document}
+\maketitle
+
+\section{General}
+
+\begin{align}
+        C &= \sum_{t} \sum_{a} \sum_{b \in C_{a}^{(t)}} \left( \underbrace{log \sigma \left( x_{b}^{(t)} \cdot 
+                y_{a}^{(t)} \right)}_{u_p}
+                + \sum_{c} \underbrace{log \sigma \left( - x_{b}^{(t)} \cdot y_{c}^{(t)} \right)}_{u_n} \right)
+\end{align}
+
+Setup when training:
+\begin{itemize}
+	\item I normalize the time of the whole dataset to be between 0-10 for all datasets
+	\item We don't have alterations currently, everything is trained all the time
+\end{itemize} 
+
+
+\section{Subsampling}
+I still subsample frequent words using $P(w_i) = 1 - \sqrt{\frac{1}{f(w_i)}}$. I also subsample documents in the following way:
+\begin{itemize}
+	\item From a training set I always take a fixed number $N$ of $(a, b)$ pairs
+	\item From every document I take a fixed number $M$ of $(a, b)$ pairs limiting the number of paris having the same target with $K$. 
+	\item When choosing a pair from document the closer the words in it are the higher the chance of it being choosen.
+	\item Depending on $N, M$ I calculate the probability of taking a document so that the whole dataset is always equaly present in the subsampled training set. 
+\end{itemize}
+
+\section{Clustering}
+NOTE: All of this aren't really probabilities because they are not in the range 0-1 and the sum is not one, maybe we should denote them differently. 
+
+The basic formula used for clustering is:
+\begin{equation}
+	p(c \mid d) \approx \prod_{w_i \in d}{p(c \mid w_i) f_c(t_i)}
+\end{equation}
+Which is changed into:
+\begin{equation}
+	p(c \mid d) \approx \sum_{w_i \in d}{log(p(c \mid w_i) f_c(t_i))}
+\end{equation}
+for reasons of having a lot of words in the documents. Once this is calculated the document is clustered with:
+\begin{equation}
+	doc\_cluster = \arg\max_{c \in C} p(c \mid d)
+\end{equation}
+
+\section{Time Prediction}
+Time prediction is similar to clustering except I don't use the time limiting function:
+\begin{equation}
+	p(c \mid d) \approx \sum_{w_i \in d}{log(p(c \mid w_i))}
+\end{equation}
+Now because this values are always negative (and I don't know an other way) I do:
+\begin{equation}
+	p'(c \mid d) \propto \frac{1}{\mid p(c \mid d) \mid}
+\end{equation}
+Once I have this probability I do weight average to predict time:
+\begin{equation}
+	predicted\_time = \frac{\sum_{c \in C}{p'(c \mid d)t_c}}{\sum_c{p'(c \mid d)}}
+\end{equation}
+
+\section{Finished Tests}
+I'll not write the tests I've been running until now, I can't find all the data. Will do new ones and update.
+
+\section{Running Tests}
+Tests that are currently running, approximately it takes one day for a test to finish.
+\begin{table}[h!]
+	\begin{tabular}{|l|l|c|c|c|l|} 
+      		\rowcolor[gray]{0.7}
+
+		\hline
+		Notes & Dataset & Iterations & clusters & Tau & Folder \\ \hline
+		Without reg or cap & NIPS & 500 & 300 & 1 & normal \\ \hline
+		Without reg or cap & NIPS & 500 & 300 & 0 & normal\_tau \\ \hline
+		reg=0.00001 & NIPS & 500 & 300 & 1 & reg5 \\ \hline
+		reg=0.000001 & NIPS & 500 & 300 & 1 & reg6 \\ \hline
+		Without reg, normalization & NIPS & 500 & 300 & 1 & normalization \\ \hline
+		Without reg or cap & Tweets & 500 & 500 & 0 & tweets\_tau \\ \hline
+
+	\end{tabular}
+\end{table}
+
+\section{TODO}
+
+\begin{itemize}
+	\item Try using aleterations, not so easy to implement
+\end{itemize}
+
+\end{document}
