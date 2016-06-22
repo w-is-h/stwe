@@ -7,13 +7,13 @@ import sys
 #python train_word2vec.py --data= ../data/final.txt --save-path=../output/models/word2vec.dat 
 
 parser = argparse.ArgumentParser(description='Compute vectors using gensim word2vec.')
-parser.add_argument('--min-frequency', help='Minimum word frequency', type=int, default=5)
+parser.add_argument('--min-frequency', help='Minimum word frequency', type=int, default=500)
 parser.add_argument('--data', help='Input data file', required=True)
 parser.add_argument('--emb-dim', help='Dim of vector representations', type=int, default=100)
 parser.add_argument('--save-path', help='Output file for the trained model', required=True)
 parser.add_argument('--window-size', help='Max distance between current and predicted word', type=int, default=5)
 parser.add_argument('--sample', help='Subsampling', type=float, default=5e-5)
-parser.add_argument('--nworkers', help='Number of threads to use', type=int, default=1)
+parser.add_argument('--nworkers', help='Number of threads to use', type=int, default=4)
 parser.add_argument('--nneg', help='Number of negative samples to use', type=int, default=5)
 
 
