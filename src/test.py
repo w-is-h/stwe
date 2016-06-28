@@ -1,3 +1,3 @@
 from twe import *
 
-main("s")
+main()

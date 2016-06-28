@@ -77,8 +77,24 @@ Once I have this probability I do weight average to predict time:
 \end{equation}
 
 \section{Finished Tests}
-I'll not write the tests I've been running until now, I can't find all the data. Will do new ones and update.
+Notes:
+\begin{itemize}
+  \item Cap
+  \item tau=0
+  \item regularization
+\end{itemize}
+Results are in /develop/results/
 
+\begin{table}[h!]
+	\begin{tabular}{|l|l|c|c|c|l|} 
+      		\rowcolor[gray]{0.7}
+		\hline
+		Notes & Dataset & Iterations & clusters & Tau & Name \\ \hline
+		Without reg or cap & NIPS & 500 & 300 & 1 & normal \\ \hline
+		Without reg or cap & NIPS & 500 & 300 & 0 & normal\_tau \\ \hline
+		Without reg, normalization & NIPS & 500 & 300 & 1 & normalization \\ \hline
+	\end{tabular}
+\end{table}
 \section{Running Tests}
 Tests that are currently running, approximately it takes one day for a test to finish.
 \begin{table}[h!]
@@ -87,12 +103,8 @@ Tests that are currently running, approximately it takes one day for a test to f
 
 		\hline
 		Notes & Dataset & Iterations & clusters & Tau & Folder \\ \hline
-		Without reg or cap & NIPS & 500 & 300 & 1 & normal \\ \hline
-		Without reg or cap & NIPS & 500 & 300 & 0 & normal\_tau \\ \hline
-		reg=0.00001 & NIPS & 500 & 300 & 1 & reg5 \\ \hline
-		reg=0.000001 & NIPS & 500 & 300 & 1 & reg6 \\ \hline
-		Without reg, normalization & NIPS & 500 & 300 & 1 & normalization \\ \hline
-		Without reg or cap & Tweets & 500 & 500 & 0 & tweets\_tau \\ \hline
+		tau=0.01 & NIPS & 500 & 300 & 0 & normal\_tau\_small \\ \hline
+    tau=0.01 & Tweets & 500 & 500 & 0 & tweets\_tau\_small \\ \hline
 
 	\end{tabular}
 \end{table}
