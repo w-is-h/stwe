@@ -239,7 +239,12 @@ class TempWordEmb(object):
         loss = self.nce_loss(true_logits, sampled_logits)
 
         self._loss = loss
+        
+        
         self.optimize(loss)
+        #Aleterations
+        #self.optimize_a2(loss)
+        #self.optimize_a1(loss)
 
         # Variables for train and test loss
         self.train_loss = tf.placeholder(tf.float32)
@@ -319,11 +324,11 @@ class TempWordEmb(object):
         # Fill _cent_word and _cent_cntx
         for word in self._id2word:
             #Normalization
-            #self._cent_word.append(gensim.matutils.unitvec(word2vec.syn0[word2vec.vocab[word].index]))
-            #self._cent_cntx.append(gensim.matutils.unitvec(word2vec.syn1neg[word2vec.vocab[word].index]))
+            self._cent_word.append(gensim.matutils.unitvec(word2vec.syn0[word2vec.vocab[word].index]))
+            self._cent_cntx.append(gensim.matutils.unitvec(word2vec.syn1neg[word2vec.vocab[word].index]))
             
-            self._cent_word.append(word2vec.syn0[word2vec.vocab[word].index])
-            self._cent_cntx.append(word2vec.syn1neg[word2vec.vocab[word].index])
+            #self._cent_word.append(word2vec.syn0[word2vec.vocab[word].index])
+            #self._cent_cntx.append(word2vec.syn1neg[word2vec.vocab[word].index])
 
 
         opts.vocab_size = len(self._id2word)
@@ -663,7 +668,7 @@ class TempWordEmb(object):
                 self.train_loss: self._train_loss,
                 self.test_loss: self._test_loss}
 
-            _, _loss = self._session.run([self._train, self._loss], feed_dict)
+            _, _loss = self._session.run([self._train_a2, self._loss], feed_dict)
             queue.task_done()
  
 
@@ -715,8 +720,9 @@ class TempWordEmb(object):
                 self.epoch: self._epoch}
  
             _, _loss = self._session.run([self._train, self._loss], feed_dict)
+           
             loss += _loss
-
+        
         loss = loss / float(opts.epoch_size // opts.batch_size)
         self._train_loss = loss
         """
@@ -790,6 +796,49 @@ class TempWordEmb(object):
         optimizer = tf.train.AdamOptimizer(opts.learning_rate, epsilon=1e-4)
         train = optimizer.minimize(loss, gate_gradients=optimizer.GATE_NONE)
         self._train = train
+
+    def optimize_a1(self, loss):
+        opts = self._options
+        
+        optimizer = tf.train.AdamOptimizer(opts.learning_rate, epsilon=1e-4)
+        grads_and_vars = optimizer.compute_gradients(loss, gate_gradients=optimizer.GATE_NONE)
+        
+        gav = []
+        for ind in range(len(grads_and_vars)):
+            pair = grads_and_vars[ind]
+            if pair[1] == self.rho:
+                gav.append(pair)
+
+        train = optimizer.apply_gradients(gav)
+        self._train_a1 = train
+
+
+    def optimize_a2(self, loss):
+        opts = self._options
+        
+        optimizer = tf.train.AdamOptimizer(opts.learning_rate, epsilon=1e-4)
+        grads_and_vars = optimizer.compute_gradients(loss, gate_gradients=optimizer.GATE_NONE)
+        self.gav = grads_and_vars
+        
+        gav = []
+        for ind in range(len(grads_and_vars)):
+            pair = grads_and_vars[ind]
+            if pair[1] != self.rho:
+                print(str(pair[1].name))
+                gav.append(pair)
+
+            if pair[1] == self.word_clst:
+                print("YES")
+                print(pair[1].name)
+
+            if pair[1] == self.rho:
+                print("RHO")
+                print(pair[1].name)
+
+        train = optimizer.apply_gradients(gav)
+        self._train_a2 = train
+
+
 
     def nce_loss(self, true_logits, negative_logits):
         """Build the graph for the NCE loss."""
@@ -870,10 +919,10 @@ def test_time_pred(rho, data, word2id, clst_time, tau):
             else:
                 prob = prob + np.log(1 / (1 + np.exp(-rho[word2id[word], :])))
         if prob is not None:
-            prob[np.isnan(prob)] = 10e9
-            prob = 1 / np.abs(prob)
+            prob[np.isnan(prob)] = -10e9
+            z = np.max(prob)
             if np.sum(prob) != 0:
-                pred = np.sum(np.reshape(clst_time, -1) * prob) / np.sum(prob)
+                pred = np.sum(np.reshape(clst_time, -1) * np.exp(prob - z)) / np.sum(np.exp(prob - z))
 
                 error += np.abs(pred - time)
                 cnt += 1

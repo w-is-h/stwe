@@ -15,6 +15,7 @@ tmp/
 
 
 #tmp and similar files
+.nfs*
 *.pyc
 *.out
 *.swp
