@@ -38,15 +38,28 @@ NOTE: All of this aren't really probabilities because they are not in the range 
 
 The basic formula used for clustering is:
 \begin{equation}
+  p(c \mid d) = \frac{p(d \mid c) p(c)}{p(d)}
+\end{equation}
+Given that the probability of every cluster and document is the same, we can ignore that and get:
+\begin{equation}
+  p(c \mid d) \propto p(d \mid c)
+\end{equation}
+Now we have the probability of a word given a cluster and we define the probability of a document given a cluster to be the product of all words in the document:
+\begin{equation}
+  p(d \mid c) \approx \prod_{w_i \in d}{p(c \mid w_i) f_c(t_i)}
+\end{equation}
+Which means:
+\begin{equation}
 	p(c \mid d) \approx \prod_{w_i \in d}{p(c \mid w_i) f_c(t_i)}
 \end{equation}
+
 Which is changed into:
 \begin{equation}
-	p(c \mid d) \approx \sum_{w_i \in d}{log(p(c \mid w_i) f_c(t_i))}
+  log(p(c \mid d)) \approx \sum_{w_i \in d}{log(p(c \mid w_i) f_c(t_i))}
 \end{equation}
 for reasons of having a lot of words in the documents. Once this is calculated the document is clustered with:
 \begin{equation}
-	doc\_cluster = \arg\max_{c \in C} p(c \mid d)
+  doc\_cluster = \arg\max_{c \in C} log(p(c \mid d))
 \end{equation}
 
 \section{Time Prediction}
