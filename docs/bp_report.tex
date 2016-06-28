@@ -34,38 +34,66 @@ I still subsample frequent words using $P(w_i) = 1 - \sqrt{\frac{1}{f(w_i)}}$. I
 \end{itemize}
 
 \section{Clustering}
-NOTE: All of this aren't really probabilities because they are not in the range 0-1 and the sum is not one, maybe we should denote them differently. 
 
 The basic formula used for clustering is:
 \begin{equation}
-	p(c \mid d) \approx \prod_{w_i \in d}{p(c \mid w_i) f_c(t_i)}
+  p(c \mid d) = \frac{p(d \mid c) p(c)}{p(d)}
 \end{equation}
-Which is changed into:
+Given that $p(c)$ and $p(d)$ are the same for every cluster and document, we get:
 \begin{equation}
-	p(c \mid d) \approx \sum_{w_i \in d}{log(p(c \mid w_i) f_c(t_i))}
+  p(c \mid d) \propto p(d \mid c)
 \end{equation}
-for reasons of having a lot of words in the documents. Once this is calculated the document is clustered with:
+Now we have the probability of a word given a cluster and we define the probability of a document given a cluster to be the product of all words in the document:
 \begin{equation}
-	doc\_cluster = \arg\max_{c \in C} p(c \mid d)
+  p(d \mid c) = \prod_{w_i \in d}{p(c \mid w_i) f_c(t_i)}
+\end{equation}
+Which means:
+\begin{equation}
+	p(c \mid d) = \prod_{w_i \in d}{p(c \mid w_i) f_c(t_i)}
+\end{equation}
+We take a $log$ of the probability for convenience:
+\begin{equation}
+  log(p(c \mid d)) = \sum_{w_i \in d}{log(p(c \mid w_i) f_c(t_i))}
+\end{equation}
+Once this is calculated the document is clustered with:
+\begin{equation}
+  doc\_cluster = \arg\max_{c \in C} log(p(c \mid d))
 \end{equation}
 
 \section{Time Prediction}
-Time prediction is similar to clustering except I don't use the time limiting function:
+Time prediction is similar to clustering except we don't use the time limiting function:
 \begin{equation}
-	p(c \mid d) \approx \sum_{w_i \in d}{log(p(c \mid w_i))}
+	p(t \mid d) = \prod_{w_i \in d}{p(c \mid w_i)}
 \end{equation}
-Now because this values are always negative (and I don't know an other way) I do:
+We define the log of this probability as: $ l_c = log(p(t \mid d)) $ \
+Now we can predict the time as:
 \begin{equation}
-	p'(c \mid d) \propto \frac{1}{\mid p(c \mid d) \mid}
+  predicted\_time = \frac{\sum_{c \in C}{e^{l_c}t_c}}{\sum_c{e^{l_c}}}
 \end{equation}
-Once I have this probability I do weight average to predict time:
+We multiply this by $\frac{e^{-z}}{e^{-z}}$ where $z = max(l_c)$ and get WHY (I know why, but how to explain it normally):
 \begin{equation}
-	predicted\_time = \frac{\sum_{c \in C}{p'(c \mid d)t_c}}{\sum_c{p'(c \mid d)}}
+  predicted\_time = \frac{\sum_{c \in C}{e^{l_c - z}t_c}}{\sum_c{e^{l_c - z}}}
 \end{equation}
 
 \section{Finished Tests}
-I'll not write the tests I've been running until now, I can't find all the data. Will do new ones and update.
+Notes:
+\begin{itemize}
+  \item Cap
+  \item tau=0
+  \item regularization
+\end{itemize}
+Results are in /develop/results/
 
+\begin{table}[h!]
+	\begin{tabular}{|l|l|c|c|c|l|} 
+      		\rowcolor[gray]{0.7}
+		\hline
+		Notes & Dataset & Iterations & clusters & Tau & Name \\ \hline
+		Without reg or cap & NIPS & 500 & 300 & 1 & normal \\ \hline
+		Without reg or cap & NIPS & 500 & 300 & 0 & normal\_tau \\ \hline
+		Without reg, normalization & NIPS & 500 & 300 & 1 & normalization \\ \hline
+	\end{tabular}
+\end{table}
 \section{Running Tests}
 Tests that are currently running, approximately it takes one day for a test to finish.
 \begin{table}[h!]
@@ -74,12 +102,9 @@ Tests that are currently running, approximately it takes one day for a test to f
 
 		\hline
 		Notes & Dataset & Iterations & clusters & Tau & Folder \\ \hline
-		Without reg or cap & NIPS & 500 & 300 & 1 & normal \\ \hline
-		Without reg or cap & NIPS & 500 & 300 & 0 & normal\_tau \\ \hline
-		reg=0.00001 & NIPS & 500 & 300 & 1 & reg5 \\ \hline
-		reg=0.000001 & NIPS & 500 & 300 & 1 & reg6 \\ \hline
-		Without reg, normalization & NIPS & 500 & 300 & 1 & normalization \\ \hline
-		Without reg or cap & Tweets & 500 & 500 & 0 & tweets\_tau \\ \hline
+		tau=0.01 & NIPS & 500 & 300 & 0 & nips\_tau\_001 \\ \hline
+		tau=1 & NIPS & 500 & 300 & 0 & nips\_tau\_1 \\ \hline
+    tau=0.01 & Tweets & 500 & 500 & 0 & tweets\_tau\_small \\ \hline
 
 	\end{tabular}
 \end{table}
