@@ -12,6 +12,8 @@ tmp/
 #latex 
 /docs/*.log
 /docs/*.aux
+/docs/*.pdf
+/docs/*.dvi
 
 
 #tmp and similar files
