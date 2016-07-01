@@ -2,7 +2,7 @@ from twe import *
 import os
 
 opts = Options()
-opts.save_path = "../output/model/nips/tau_1"
+opts.save_path = "../output/model/nips/testing"
 
 try:
     os.makedirs(opts.save_path)
