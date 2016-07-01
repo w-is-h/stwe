@@ -85,13 +85,16 @@ Notes:
 Results are in /develop/results/
 
 \begin{table}[h!]
-	\begin{tabular}{|l|l|c|c|c|l|} 
+	\begin{tabular}{|l|l|c|c|c|l|l|} 
       		\rowcolor[gray]{0.7}
 		\hline
-		Notes & Dataset & Iterations & clusters & Tau & Name \\ \hline
-		Without reg or cap & NIPS & 500 & 300 & 1 & normal \\ \hline
-		Without reg or cap & NIPS & 500 & 300 & 0 & normal\_tau \\ \hline
-		Without reg, normalization & NIPS & 500 & 300 & 1 & normalization \\ \hline
+    Notes & Dataset & Iterations & clusters & Tau & Name & File \\ \hline
+    Without reg or cap & NIPS & 500 & 300 & 1 & normal & - \\ \hline
+    Without reg or cap & NIPS & 500 & 300 & 0 & normal\_tau & - \\ \hline
+    Without reg, normalization & NIPS & 500 & 300 & 1 & normalization & - \\ \hline
+    tau=1 new\_time & NIPS & 500 & 300 & 0 & tau\_1 & 29\_06\\ \hline
+    tau=0.01 & NIPS & 500 & 500 & 0 & tau\_001 & 29\_06 \\ \hline
+
 	\end{tabular}
 \end{table}
 \section{Running Tests}
@@ -102,9 +105,6 @@ Tests that are currently running, approximately it takes one day for a test to f
 
 		\hline
 		Notes & Dataset & Iterations & clusters & Tau & Folder \\ \hline
-		tau=0.01 & NIPS & 500 & 300 & 0 & nips\_tau\_001 \\ \hline
-		tau=1 & NIPS & 500 & 300 & 0 & nips\_tau\_1 \\ \hline
-    tau=0.01 & Tweets & 500 & 500 & 0 & tweets\_tau\_small \\ \hline
 
 	\end{tabular}
 \end{table}
