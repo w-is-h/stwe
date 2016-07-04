@@ -241,10 +241,10 @@ class TempWordEmb(object):
         self._loss = loss
         
         
-        self.optimize(loss)
+        #self.optimize(loss)
         #Aleterations
-        #self.optimize_a2(loss)
-        #self.optimize_a1(loss)
+        self.optimize_a2(loss)
+        self.optimize_a1(loss)
 
         # Variables for train and test loss
         self.train_loss = tf.placeholder(tf.float32)
@@ -718,9 +718,11 @@ class TempWordEmb(object):
                 self.cent_word: self._cent_word,
                 self.cent_cntx: self._cent_cntx,
                 self.epoch: self._epoch}
- 
-            _, _loss = self._session.run([self._train, self._loss], feed_dict)
-           
+            if self._epoch % 2 == 0:
+                _, _loss = self._session.run([self._train_a1, self._loss], feed_dict)
+            else:
+                _, _loss = self._session.run([self._train_a2, self._loss], feed_dict)
+
             loss += _loss
         
         loss = loss / float(opts.epoch_size // opts.batch_size)
@@ -774,28 +776,20 @@ class TempWordEmb(object):
         """Build the graph to optimize the loss function."""
         opts = self._options
         
-        """
         optimizer = tf.train.AdamOptimizer(opts.learning_rate, epsilon=1e-4)
         grads_and_vars = optimizer.compute_gradients(loss, gate_gradients=optimizer.GATE_NONE)
-        
-        gav = []
-        for ind in range(len(grads_and_vars)):
-            pair = grads_and_vars[ind]
-            if pair[1] == self.word_clst:
-                gav.append((pair[0] - tf.sign(self.word_clst) * opts.l2lmbd * tf.square(self.word_clst), pair[1]))
-            elif pair[1] == self.cntx_clst:
-                gav.append((pair[0] - tf.sign(self.cntx_clst) * opts.l2lmbd * tf.square(self.cntx_clst), pair[1]))
-            else:
-                gav.append(pair)
 
-        train = optimizer.apply_gradients(gav)
+        self.gov = grads_and_vars
+        
+        train = optimizer.apply_gradients(grads_and_vars)
         
         self._train = train
+        
         """
-
         optimizer = tf.train.AdamOptimizer(opts.learning_rate, epsilon=1e-4)
         train = optimizer.minimize(loss, gate_gradients=optimizer.GATE_NONE)
         self._train = train
+        """
 
     def optimize_a1(self, loss):
         opts = self._options
@@ -806,7 +800,8 @@ class TempWordEmb(object):
         gav = []
         for ind in range(len(grads_and_vars)):
             pair = grads_and_vars[ind]
-            if pair[1] == self.rho:
+            if "rho" in pair[1].name:
+                print(str(pair[1].name))
                 gav.append(pair)
 
         train = optimizer.apply_gradients(gav)
@@ -823,17 +818,9 @@ class TempWordEmb(object):
         gav = []
         for ind in range(len(grads_and_vars)):
             pair = grads_and_vars[ind]
-            if pair[1] != self.rho:
+            if "rho" not in pair[1].name:
                 print(str(pair[1].name))
                 gav.append(pair)
-
-            if pair[1] == self.word_clst:
-                print("YES")
-                print(pair[1].name)
-
-            if pair[1] == self.rho:
-                print("RHO")
-                print(pair[1].name)
 
         train = optimizer.apply_gradients(gav)
         self._train_a2 = train
