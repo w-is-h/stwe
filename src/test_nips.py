@@ -2,15 +2,15 @@ from twe import *
 import os
 
 opts = Options()
-opts.save_path = "../output/model/nips/testing"
+opts.save_path = "../output/model/nips/same_div_00001_01"
 
 try:
     os.makedirs(opts.save_path)
 except:
     pass
 
-
-opts.tau = 1
+opts.learning_rate=0.0001
+opts.tau = 0.1
 
 opts.train_data = "../data/train.txt"
 opts.test_data = "../data/test.txt"

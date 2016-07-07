@@ -95,7 +95,7 @@ class Options(object):
         self.lr_decay = 1
 
         # Number of negative samples per example.
-        self.nneg = 2
+        self.nneg = 1
 
         # Concurrent training steps.
         self.concurrent_steps = 8
@@ -324,11 +324,11 @@ class TempWordEmb(object):
         # Fill _cent_word and _cent_cntx
         for word in self._id2word:
             #Normalization
-            self._cent_word.append(gensim.matutils.unitvec(word2vec.syn0[word2vec.vocab[word].index]))
-            self._cent_cntx.append(gensim.matutils.unitvec(word2vec.syn1neg[word2vec.vocab[word].index]))
+            self._cent_word.append(gensim.matutils.unitvec(word2vec.syn0[word2vec.vocab[word].index]) / 100.0)
+            self._cent_cntx.append(gensim.matutils.unitvec(word2vec.syn1neg[word2vec.vocab[word].index]) / 100.0)
             
-            #self._cent_word.append(word2vec.syn0[word2vec.vocab[word].index])
-            #self._cent_cntx.append(word2vec.syn1neg[word2vec.vocab[word].index])
+            #self._cent_word.append(word2vec.syn0[word2vec.vocab[word].index] / 100)
+            #self._cent_cntx.append(word2vec.syn1neg[word2vec.vocab[word].index] / 100)
 
 
         opts.vocab_size = len(self._id2word)
@@ -364,7 +364,7 @@ class TempWordEmb(object):
         # word_clst - Clusters for embedded words
         self.word_clst = tf.Variable(tf.random_uniform([opts.nclst, opts.emb_dim], -0.5, 0.5), name='word_clst')
         # cntx_clst - Clusters for context
-        self.cntx_clst = tf.Variable(tf.random_uniform([opts.nclst, opts.emb_dim], -0.5, 0.5), name='cntx_clst')
+        self.cntx_clst = self.word_clst #tf.Variable(tf.random_uniform([opts.nclst, opts.emb_dim], -0.5, 0.5), name='cntx_clst')
 
         # clst_time - Timestamp for each cluster
         self.clst_time = tf.Variable(tf.random_uniform([opts.nclst, 1], opts.start_time, opts.end_time, 
@@ -386,7 +386,7 @@ class TempWordEmb(object):
         word_emb = tf.nn.embedding_lookup(cent_word, tf.reshape(train_labels, [-1]))
         # cent_cntx - Central representation for context representations
         self.cent_cntx = tf.placeholder(tf.float32, shape=[opts.vocab_size, opts.emb_dim], name='cent_cntx')
-        cent_cntx = self.cent_cntx
+        cent_cntx = self.cent_word #self.cent_cntx
         cntx_emb = tf.nn.embedding_lookup(cent_cntx, tf.reshape(train_inputs, [-1]))
 
         # Rho lookup
@@ -722,7 +722,7 @@ class TempWordEmb(object):
                 _, _loss = self._session.run([self._train_a1, self._loss], feed_dict)
             else:
                 _, _loss = self._session.run([self._train_a2, self._loss], feed_dict)
-
+            
             loss += _loss
         
         loss = loss / float(opts.epoch_size // opts.batch_size)
@@ -861,7 +861,6 @@ def cluster_docs(rho, data, word2id, clst_time, tau):
         for word in doc:
             if word not in word2id:
                 continue
-
             if prob is None:
                 prob = np.log(1 / (1 + np.exp(-rho[word2id[word], :])) * time_diff)
             else:
@@ -921,7 +920,7 @@ def words_in_cluster(rho, id2word, topw=20):
     
     top_ind = []
     for cind in range(rho.shape[1]):
-        probs = rho[:, cind] / np.sum(rho[:, [x for x in range(rho.shape[1]) if x != cind]])
+        probs = rho[:, cind] / np.sum(rho[:, [x for x in range(rho.shape[1]) if x != cind]], 1)
         top_ind.append(np.argsort(-probs)[0:topw])
 
     return top_ind
@@ -937,7 +936,7 @@ def main(opts=None):
             for i in range(opts.nepochs):
                 twe._epoch = i
                 print("Started epoch: {}".format(i))
-                if i % 10 == 0:
+                if i % 30 == 0:
                     #Save the tf model
                     twe.saver.save(twe._session, opts.save_path + "model", global_step=i)
 
