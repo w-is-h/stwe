@@ -324,11 +324,11 @@ class TempWordEmb(object):
         # Fill _cent_word and _cent_cntx
         for word in self._id2word:
             #Normalization
-            self._cent_word.append(gensim.matutils.unitvec(word2vec.syn0[word2vec.vocab[word].index]) / 100.0)
-            self._cent_cntx.append(gensim.matutils.unitvec(word2vec.syn1neg[word2vec.vocab[word].index]) / 100.0)
+            #self._cent_word.append(gensim.matutils.unitvec(word2vec.syn0[word2vec.vocab[word].index]) / 100.0)
+            #self._cent_cntx.append(gensim.matutils.unitvec(word2vec.syn1neg[word2vec.vocab[word].index]) / 100.0)
             
-            #self._cent_word.append(word2vec.syn0[word2vec.vocab[word].index] / 100)
-            #self._cent_cntx.append(word2vec.syn1neg[word2vec.vocab[word].index] / 100)
+            self._cent_word.append(word2vec.syn0[word2vec.vocab[word].index])
+            self._cent_cntx.append(word2vec.syn1neg[word2vec.vocab[word].index])
 
 
         opts.vocab_size = len(self._id2word)
@@ -364,7 +364,7 @@ class TempWordEmb(object):
         # word_clst - Clusters for embedded words
         self.word_clst = tf.Variable(tf.random_uniform([opts.nclst, opts.emb_dim], -0.5, 0.5), name='word_clst')
         # cntx_clst - Clusters for context
-        self.cntx_clst = self.word_clst #tf.Variable(tf.random_uniform([opts.nclst, opts.emb_dim], -0.5, 0.5), name='cntx_clst')
+        self.cntx_clst = tf.Variable(tf.random_uniform([opts.nclst, opts.emb_dim], -0.5, 0.5), name='cntx_clst')
 
         # clst_time - Timestamp for each cluster
         self.clst_time = tf.Variable(tf.random_uniform([opts.nclst, 1], opts.start_time, opts.end_time, 
@@ -386,7 +386,7 @@ class TempWordEmb(object):
         word_emb = tf.nn.embedding_lookup(cent_word, tf.reshape(train_labels, [-1]))
         # cent_cntx - Central representation for context representations
         self.cent_cntx = tf.placeholder(tf.float32, shape=[opts.vocab_size, opts.emb_dim], name='cent_cntx')
-        cent_cntx = self.cent_word #self.cent_cntx
+        cent_cntx = self.cent_cntx
         cntx_emb = tf.nn.embedding_lookup(cent_cntx, tf.reshape(train_inputs, [-1]))
 
         # Rho lookup
@@ -795,6 +795,8 @@ class TempWordEmb(object):
         opts = self._options
         
         optimizer = tf.train.AdamOptimizer(opts.learning_rate, epsilon=1e-4)
+        #lr = tf.maximum(0.0001, opts.learning_rate / tf.cast(tf.square(self.epoch + 1), tf.float32))
+        #optimizer = tf.train.GradientDescentOptimizer(lr)
         grads_and_vars = optimizer.compute_gradients(loss, gate_gradients=optimizer.GATE_NONE)
         
         gav = []
@@ -812,6 +814,9 @@ class TempWordEmb(object):
         opts = self._options
         
         optimizer = tf.train.AdamOptimizer(opts.learning_rate, epsilon=1e-4)
+        #lr = tf.maximum(0.0001, opts.learning_rate / tf.cast(tf.square(self.epoch + 1), tf.float32))
+        #optimizer = tf.train.GradientDescentOptimizer(lr)
+ 
         grads_and_vars = optimizer.compute_gradients(loss, gate_gradients=optimizer.GATE_NONE)
         self.gav = grads_and_vars
         
@@ -862,16 +867,19 @@ def cluster_docs(rho, data, word2id, clst_time, tau):
             if word not in word2id:
                 continue
             if prob is None:
-                prob = np.log(1 / (1 + np.exp(-rho[word2id[word], :])) * time_diff)
+                tmp = (1 / 1 + np.exp(-rho[word2id[word], :])) * time_diff
+                tmp[tmp == 0] = 0.000000001
+                prob = np.log(tmp)
             else:
-                prob = prob + np.log((1 / (1 + np.exp(-rho[word2id[word], :])) * time_diff))
+                tmp = (1 / 1 + np.exp(-rho[word2id[word], :])) * time_diff
+                tmp[tmp == 0] = 0.000000001
+                prob = prob + np.log(tmp)
 
 
         if prob is None:
             clsts.append(0)
         else:
             prob = np.array(prob)
-            prob[np.isnan(prob)] = -10e9
             clsts.append(np.argmax(prob))
 
     return clsts
