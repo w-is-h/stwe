@@ -97,7 +97,7 @@ class Options(object):
         self.lr_decay = 1
 
         # Number of negative samples per example.
-        self.nneg = 1
+        self.nneg = 3
 
         # Concurrent training steps.
         self.concurrent_steps = 8
@@ -460,46 +460,50 @@ class TempWordEmb(object):
 
         ### Negative sampling
         labels_matrix = tf.reshape(tf.cast(train_labels, dtype=tf.int64), [opts.batch_size, 1])
+        
+        all_repr_neg = []
+        for i in range(opts.nneg):
+            negative_ids, _, _ = (tf.nn.fixed_unigram_candidate_sampler(
+                true_classes=labels_matrix,
+                num_true=1,
+                num_sampled=opts.batch_size,
+                unique=False,
+                range_max=opts.vocab_size,
+                distortion=0.75,
+                unigrams=opts.train_data_params['cnts'].tolist()))
 
-        negative_ids, _, _ = (tf.nn.fixed_unigram_candidate_sampler(
-            true_classes=labels_matrix,
-            num_true=1,
-            num_sampled=opts.batch_size,
-            unique=False,
-            range_max=opts.vocab_size,
-            distortion=0.75,
-            unigrams=opts.train_data_params['cnts'].tolist()))
+            # Bring negative ids to correct shape
+            negative_ids = tf.reshape(negative_ids, [-1, 1])
 
-        # Bring negative ids to correct shape
-        negative_ids = tf.reshape(negative_ids, [-1, 1])
+            # Rho lookup
+            rho_lup_neg = tf.nn.embedding_lookup(self.rho, tf.reshape(negative_ids, [-1]))
 
-        # Rho lookup
-        rho_lup_neg = tf.nn.embedding_lookup(self.rho, tf.reshape(negative_ids, [-1]))
+            # We have to flatten the rho_lup to match the flat_selected_time_diff_ind
+            flat_rho_lup_neg = tf.reshape(rho_lup_neg, [-1, 1])
 
-        # We have to flatten the rho_lup to match the flat_selected_time_diff_ind
-        flat_rho_lup_neg = tf.reshape(rho_lup_neg, [-1, 1])
+            # Rhos for selected clusters based on time difference between word and clst_time
+            selected_rho_neg = tf.gather(flat_rho_lup_neg, flat_selected_time_diff_ind)
 
-        # Rhos for selected clusters based on time difference between word and clst_time
-        selected_rho_neg = tf.gather(flat_rho_lup_neg, flat_selected_time_diff_ind)
+            # Make t vars for calculating the transform function g_c(x_a)
+            #selected_clst are cluster embeddings for every context in the input
+            #t_a is all words repated M times, where M is the number of clusters used
+            selected_clst_neg = tf.nn.embedding_lookup(self.cntx_clst, tf.reshape(selected_time_diff_ind, [-1])) 
+            t_a_neg = tf.reshape(tf.tile(negative_ids, [1, opts.clst_window]), [-1])
+            selected_emb_neg = tf.nn.embedding_lookup(cent_cntx, t_a_neg)
 
-        # Make t vars for calculating the transform function g_c(x_a)
-        #selected_clst are cluster embeddings for every context in the input
-        #t_a is all words repated M times, where M is the number of clusters used
-        selected_clst_neg = tf.nn.embedding_lookup(self.cntx_clst, tf.reshape(selected_time_diff_ind, [-1])) 
-        t_a_neg = tf.reshape(tf.tile(negative_ids, [1, opts.clst_window]), [-1])
-        selected_emb_neg = tf.nn.embedding_lookup(cent_cntx, t_a_neg)
+            gc_neg = selected_clst_neg - selected_emb_neg
 
-        gc_neg = selected_clst_neg - selected_emb_neg
+            dynamic_repr_neg = tf.reduce_sum( tf.reshape(gc_neg * tf.sigmoid(selected_rho_neg) * fc, 
+                [opts.batch_size, opts.emb_dim, opts.clst_window]), 2) 
 
-        dynamic_repr_neg = tf.reduce_sum( tf.reshape(gc_neg * tf.sigmoid(selected_rho_neg) * fc, 
-            [opts.batch_size, opts.emb_dim, opts.clst_window]), 2) 
-
-        # The final representation (static + dynamic) of all contexts in the input dataset
-        neg_emb = tf.nn.embedding_lookup(cent_cntx, tf.reshape(negative_ids, [-1]))
-        all_repr_neg = neg_emb + dynamic_repr_neg
+            # The final representation (static + dynamic) of all contexts in the input dataset
+            neg_emb = tf.nn.embedding_lookup(cent_cntx, tf.reshape(negative_ids, [-1]))
+            all_repr_neg.append(neg_emb + dynamic_repr_neg)
 
         # A hack allowing us to have more than one negative word per example.
-        t_all_repr_neg = tf.tile(all_repr_neg, [opts.nneg, 1])
+        #t_all_repr_neg = tf.tile(all_repr_neg, [opts.nneg, 1])
+        # THE REMOVE USED
+        t_all_repr_neg = tf.concat(0, all_repr_neg)
         t_all_repr_word = tf.reshape(tf.tile(all_repr_word, [1, opts.nneg]), [opts.nneg * opts.batch_size, -1])
 
         t_negative_logits = tf.reduce_sum(tf.mul(t_all_repr_word, t_all_repr_neg), 1) #+ true_b
