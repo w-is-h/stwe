@@ -13,7 +13,7 @@ except:
 
 
 opts.tau = 1
-opts.learning_rate = 0.0001
+opts.learning_rate = 0.0005
 
 opts.start_time = 1244732370
 opts._start_time = 1244732370
