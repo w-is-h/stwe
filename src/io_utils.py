@@ -26,7 +26,7 @@ class DocumentTimePair(object):
         self.s_prob = s_prob
 
     def __iter__(self):
-        for line in open(self.path):
+        for line in self.path:
             if self.s_prob == 1 or self.s_prob > np.random.rand():
                 parts = line.split("\t")
                 if self.time_transform != 0 and self.start_time != 0:

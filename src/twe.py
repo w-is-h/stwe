@@ -7,6 +7,7 @@ from gensim.models import Word2Vec
 from io_utils import DocumentTimePair
 from queue import Queue
 from threading import Thread
+from multiprocessing import Process, Queue
 
 """
 flags = tf.app.flags
@@ -50,6 +51,7 @@ FLAGS = flags.FLAGS
 class Options(object):
     """Options used by our word2vec model."""
     def __init__(self):
+        
         # Model options.
 
         # Where to write out summaries.
@@ -201,6 +203,9 @@ class Options(object):
 
 class TempWordEmb(object):
     def __init__(self, options, session):
+        # Queue for faster loading of data
+        self.batches = Queue(maxsize=options.nepochs)
+
         # Used so that the testset is keept in memory
         self._testset = None
         self._options = options
@@ -324,11 +329,11 @@ class TempWordEmb(object):
         # Fill _cent_word and _cent_cntx
         for word in self._id2word:
             #Normalization
-            self._cent_word.append(gensim.matutils.unitvec(word2vec.syn0[word2vec.vocab[word].index]) / 100.0)
-            self._cent_cntx.append(gensim.matutils.unitvec(word2vec.syn1neg[word2vec.vocab[word].index]) / 100.0)
+            #self._cent_word.append(gensim.matutils.unitvec(word2vec.syn0[word2vec.vocab[word].index]) / 100.0)
+            #self._cent_cntx.append(gensim.matutils.unitvec(word2vec.syn1neg[word2vec.vocab[word].index]) / 100.0)
             
-            #self._cent_word.append(word2vec.syn0[word2vec.vocab[word].index] / 100)
-            #self._cent_cntx.append(word2vec.syn1neg[word2vec.vocab[word].index] / 100)
+            self._cent_word.append(word2vec.syn0[word2vec.vocab[word].index])
+            self._cent_cntx.append(word2vec.syn1neg[word2vec.vocab[word].index])
 
 
         opts.vocab_size = len(self._id2word)
@@ -364,7 +369,7 @@ class TempWordEmb(object):
         # word_clst - Clusters for embedded words
         self.word_clst = tf.Variable(tf.random_uniform([opts.nclst, opts.emb_dim], -0.5, 0.5), name='word_clst')
         # cntx_clst - Clusters for context
-        self.cntx_clst = self.word_clst #tf.Variable(tf.random_uniform([opts.nclst, opts.emb_dim], -0.5, 0.5), name='cntx_clst')
+        self.cntx_clst = tf.Variable(tf.random_uniform([opts.nclst, opts.emb_dim], -0.5, 0.5), name='cntx_clst')
 
         # clst_time - Timestamp for each cluster
         self.clst_time = tf.Variable(tf.random_uniform([opts.nclst, 1], opts.start_time, opts.end_time, 
@@ -386,7 +391,7 @@ class TempWordEmb(object):
         word_emb = tf.nn.embedding_lookup(cent_word, tf.reshape(train_labels, [-1]))
         # cent_cntx - Central representation for context representations
         self.cent_cntx = tf.placeholder(tf.float32, shape=[opts.vocab_size, opts.emb_dim], name='cent_cntx')
-        cent_cntx = self.cent_word #self.cent_cntx
+        cent_cntx = self.cent_cntx
         cntx_emb = tf.nn.embedding_lookup(cent_cntx, tf.reshape(train_inputs, [-1]))
 
         # Rho lookup
@@ -709,7 +714,12 @@ class TempWordEmb(object):
         opts = self._options
 
         #eval_docs, eval_docs_time = self.generate_eval_batch(opts.train_data)
-        batch, labels, time = self.generate_batch(opts.train_data)
+        if not self.batches.empty():
+            batch, labels, time = self.batches.get()
+            print("Batch used")
+        else:
+            batch, labels, time = self.generate_batch(opts.train_data)
+
         loss = 0
         for i in range(opts.epoch_size // opts.batch_size):
             feed_dict={self.train_inputs: batch[i*opts.batch_size:(i+1)*opts.batch_size], 
@@ -795,6 +805,8 @@ class TempWordEmb(object):
         opts = self._options
         
         optimizer = tf.train.AdamOptimizer(opts.learning_rate, epsilon=1e-4)
+        #lr = tf.maximum(0.0001, opts.learning_rate / tf.cast(tf.square(self.epoch + 1), tf.float32))
+        #optimizer = tf.train.GradientDescentOptimizer(lr)
         grads_and_vars = optimizer.compute_gradients(loss, gate_gradients=optimizer.GATE_NONE)
         
         gav = []
@@ -812,6 +824,9 @@ class TempWordEmb(object):
         opts = self._options
         
         optimizer = tf.train.AdamOptimizer(opts.learning_rate, epsilon=1e-4)
+        #lr = tf.maximum(0.0001, opts.learning_rate / tf.cast(tf.square(self.epoch + 1), tf.float32))
+        #optimizer = tf.train.GradientDescentOptimizer(lr)
+ 
         grads_and_vars = optimizer.compute_gradients(loss, gate_gradients=optimizer.GATE_NONE)
         self.gav = grads_and_vars
         
@@ -862,16 +877,19 @@ def cluster_docs(rho, data, word2id, clst_time, tau):
             if word not in word2id:
                 continue
             if prob is None:
-                prob = np.log(1 / (1 + np.exp(-rho[word2id[word], :])) * time_diff)
+                tmp = (1 / 1 + np.exp(-rho[word2id[word], :])) * time_diff
+                tmp[tmp == 0] = 0.000000001
+                prob = np.log(tmp)
             else:
-                prob = prob + np.log((1 / (1 + np.exp(-rho[word2id[word], :])) * time_diff))
+                tmp = (1 / 1 + np.exp(-rho[word2id[word], :])) * time_diff
+                tmp[tmp == 0] = 0.000000001
+                prob = prob + np.log(tmp)
 
 
         if prob is None:
             clsts.append(0)
         else:
             prob = np.array(prob)
-            prob[np.isnan(prob)] = -10e9
             clsts.append(np.argmax(prob))
 
     return clsts
@@ -925,6 +943,24 @@ def words_in_cluster(rho, id2word, topw=20):
 
     return top_ind
 
+def gen_batches_target(twe, limit, opts):
+    for i in range(limit):
+        print("Batch generated")
+        batch, labels, time = twe.generate_batch(opts.train_data)
+        twe.batches.put((batch, labels, time))
+
+
+def batch_generator(twe, opts, nproc=2):
+    per_process = int(opts.nepochs / nproc)
+    
+    procs = []
+    for i in range(nproc):
+        p = Process(target=gen_batches_target, args=(twe,per_process,opts))
+        p.start()
+        procs.append(p)
+
+    for proc in procs:
+        proc.join()
 
 
 def main(opts=None):
@@ -933,6 +969,8 @@ def main(opts=None):
     with tf.Graph().as_default(), tf.Session() as session:
         with tf.device("/cpu:0"):
             twe = TempWordEmb(opts, session)
+            generator = Process(target=batch_generator, args=(twe, opts,))
+            generator.start()
             for i in range(opts.nepochs):
                 twe._epoch = i
                 print("Started epoch: {}".format(i))
@@ -970,5 +1008,6 @@ def main(opts=None):
                 twe.train()
                 twe.test()
             print("--------DONE-------")
+            generator.join()
 
 
