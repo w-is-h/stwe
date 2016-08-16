@@ -593,7 +593,7 @@ class TempWordEmb(object):
 
         batch = np.zeros((opts.epoch_size, 1), dtype=int)
         labels = np.zeros((opts.epoch_size, 1), dtype=int)
-        time = np.zeros((opts.epoch_size, 1), dtype=int)
+        time = np.zeros((opts.epoch_size, 1), dtype=float)
         n_added = 0
         test = []
 
@@ -881,14 +881,13 @@ def cluster_docs(rho, data, word2id, clst_time, tau):
             if word not in word2id:
                 continue
             if prob is None:
-                tmp = (1 / 1 + np.exp(-rho[word2id[word], :])) * time_diff
+                tmp = (1 / (1 + np.exp(-rho[word2id[word], :]))) * time_diff
                 tmp[tmp == 0] = 0.000000001
                 prob = np.log(tmp)
             else:
-                tmp = (1 / 1 + np.exp(-rho[word2id[word], :])) * time_diff
+                tmp = (1 / (1 + np.exp(-rho[word2id[word], :]))) * time_diff
                 tmp[tmp == 0] = 0.000000001
                 prob = prob + np.log(tmp)
-
 
         if prob is None:
             clsts.append(0)
@@ -1000,7 +999,7 @@ def main(opts=None):
                     test_time_pred(rho, data, twe._word2id, clst_time, tau)
 
                     #Print top words for clusters
-                    rho_exp = 1 / (1 + np.exp(-rho))
+                    #rho_exp = 1 / (1 + np.exp(-rho))
                     """
                     for irow, row in enumerate(np.transpose(rho_exp)):
                         row = np.argsort(-row)
