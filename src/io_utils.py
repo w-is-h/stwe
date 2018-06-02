@@ -6,6 +6,9 @@ from datetime import datetime
 import re
 import operator
 from gensim.models import Word2Vec
+from utils import get_logger
+
+log = get_logger("io_utils")
 
 class word2vecIterator(object):
     def __init__(self, path):
@@ -48,10 +51,10 @@ class Preprocessing(object):
         self.re_wspace = re.compile(r"[ ]+")
         self.re_web = re.compile(r"(?:http:|www)+[\w\-/\.]*")
         self.re_num = re.compile(r"(?:[^a-z]+\d[^a-z]+)")
-    
+
     def pp_doc(self, doc):
         return [x.strip() for x in doc.split() if x not in self.stopwords and len(x) > self.doc_min_len]
-    
+
     def process_tweet(self, tweet):
         tweet = tweet.lower()
         tweet = re.sub(self.re_web, " ", tweet)
@@ -66,22 +69,31 @@ class Preprocessing(object):
 
         return (tags, tweet.strip())
 
-        
-def tweets_to_sentences(in_file, out_file, out_tags_file, offset=4000):
-    """Converts SNAP tweets to senteces form and 
-    writes everything to out_file. 
 
-    New format is:
-    <timestamp>\t<sentence>
+def tweets_to_sentences(in_file, out_file_tweets, out_file_tags, offset=4000):
+    """Converts SNAP tweets to senteces and writes everything to
+    out_file_tweets. Creates one additional file containing hashtags from tweets.
+    Each line in the out_tags_file corresponds to the exact line in out_file_tweets.
+
+    in_file: file with tweets in SNAP format
+    out_file_tweets: file where the tweets in the new format will be written
+    out_file_tags: separate file containing hashtags from tweets
+    offset: amount of tweets to skip from the beginning
+
+    Output format is: <timestamp>\t<sentence>
     """
-    out = open(out_file, 'a')
-    out_tags = open(out_tags_file, 'a')
+    out_tweets = open(out_file_tweets, 'w')
+    out_tags = open(out_file_tags, 'w')
+
+    # Counter for the amount of tweets processed until now
     t_counter = 0
+
     pp = Preprocessing()
     with open(in_file) as data:
         #Skip first offset lines, usually the beginning has time messed up
         for i in range(offset):
             next(data)
+
         #Find next blank line
         while True:
             a = next(data)
@@ -98,12 +110,12 @@ def tweets_to_sentences(in_file, out_file, out_tags_file, offset=4000):
                     if t_counter % 100000 == 0:
                         print("{} : {} - Tweets processed".format(in_file, t_counter))
                     t_counter += 1
-                    
+
                     (tags, c_tweet) = pp.process_tweet(" ".join(line.split()[1:]))
                     # Processed must be longer than 8
                     if len(c_tweet.split(" ")) > 8:
                         out.write("{}\t{}\n".format(int(t), c_tweet))
-                        
+
                         if len(tags) > 0:
                             out_tags.write("{}\n".format(" ".join(tags)))
                         else:
