@@ -1,12 +1,12 @@
+import re
+import os
+import time
 from nltk.corpus import stopwords
 from langdetect import detect
-import re
-from utils import get_logger
-import os
-from exceptions import TweetLengthValidationError
-import time
 from datetime import datetime
-from params import *
+from .exceptions import TweetLengthValidationError
+from .utils import get_logger
+from .params import *
 
 log = get_logger(name='tweets_preprocessing')
 
@@ -30,10 +30,6 @@ class Preprocessing(object):
         self.re_web = re.compile(r"(?:http:|www)+[\w\-/\.]*")
         # Numbers, anywhere
         self.re_num = re.compile(r"(?:[^a-z]+\d[^a-z]+)")
-
-    def pp_doc(self, doc):
-        return [x.strip() for x in doc.split()
-                if x not in self.stopwords and len(x) > self.doc_min_len]
 
     def preprocess_tweet_general(self, tweet):
         """ This will clean the tweet of spaces, numbers and similar garbage, plus
@@ -265,5 +261,5 @@ class Preprocessing(object):
                         #print(e)
                     cnt += 1
         else:
-            raise NotImplementedError("This function is not implemented, please set the 
+            raise NotImplementedError("This function is not implemented, please set the \
                                        in_ht and in_mt files")
