@@ -1,4 +1,4 @@
-from tweets_preprocessing import Preprocessing
+from stwe.tweets_preprocessing import Preprocessing
 
 in_folder = "/home/wish/Private/other/stwe/data/stnd_tweets/raw/all_snap/"
 out_folder = "/home/wish/Private/other/stwe/data/stnd_tweets/raw/all_tuw/"
