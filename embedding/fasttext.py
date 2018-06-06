@@ -1,12 +1,13 @@
 from .emb import Embedding
 from gensim.models import FastText as gFastText
 from stwe.utils.loggers import basic_logger
+from gensim.matutils import unitvec
 
 log = basic_logger('embedding_fasttext')
 
 
 class FastText(Embedding):
-    def __init__(self, save_folder, vector_size=300, min_count=30, workers=8 **kwargs):
+    def __init__(self, save_folder, vector_size=300, min_count=30, workers=8, **kwargs):
         super().__init__(save_folder=save_folder,
                         vector_size=vector_size,
                         min_count=min_count)
@@ -26,7 +27,7 @@ class FastText(Embedding):
     def init_train(self, data_iterator, pretrained=None, epochs=1, **kwargs):
         self.emb.build_vocab(data_iterator)
         if pretrained is not None:
-            log.info("Loading pretrained Vectors, in word2vec_format")
+            log.info("Loading pretrained Vectors in binary format")
             self.emb.intersect_word2vec_format(pretrained, **kwargs)
 
         self._train(data_iterator, epochs, **kwargs)
@@ -48,7 +49,7 @@ class FastText(Embedding):
 
     def __getitem__(self, word):
         if word in self.emb.wv.vocab:
-            return unitvec(self.emb.wv.syn0[self.emb.wv.vocab[word].index])
+            return unitvec(self.emb.wv.get_vector(word))
         else:
             return None
 

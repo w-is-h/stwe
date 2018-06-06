@@ -25,7 +25,7 @@ class Word2Vec(Embedding):
     def init_train(self, data_iterator, pretrained=None, epochs=1, **kwargs):
         self.emb.build_vocab(data_iterator)
         if pretrained is not None:
-            log.info("Loading pretrained Vectors, in word2vec_format")
+            log.info("Loading pretrained Vectors in word2vec_format")
             self.emb.intersect_word2vec_format(pretrained, **kwargs)
 
         self._train(data_iterator, epochs, **kwargs)
@@ -33,7 +33,6 @@ class Word2Vec(Embedding):
 
     def continue_training(self, data_iterator, epochs=1, **kwargs):
         self.emb.build_vocab(data_iterator, update=True)
-
         self._train(data_iterator, epochs, **kwargs)
 
 
