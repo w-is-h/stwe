@@ -3,7 +3,7 @@ from os.path import join as p_join
 import pickle
 from stwe.utils.loggers import basic_logger
 
-log = basic_logger('embedding_word2vec')
+log = basic_logger('embedding')
 
 
 class Embedding(object):
@@ -50,7 +50,7 @@ class Embedding(object):
         pass
 
 
-    def save(self, save_file=None):
+    def save(self):
         f = open(p_join(self.save_folder, self.name + ".dat"), 'wb')
         pickle.dump(self, f)
         f.close()

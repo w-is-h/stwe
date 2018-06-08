@@ -44,7 +44,7 @@ class FastText(Embedding):
 
 
     def index2word(self, ind):
-        self.emb.wv.index2word(ind)
+        return self.emb.wv.index2word[ind]
 
 
     def __getitem__(self, word):
