@@ -18,20 +18,20 @@ data_iterator = EmbIteratorTUW(in_files=in_files, tokenizer=basic_tokenizer)
 
 # Train the Phraser for preprocessing_tokens
 phraser = Phraser()
-phraser.train(data_iterator, min_count=MIN_COUNT)
-phraser.save_phrases(filename="/home/wish/Private/other/stwe/models/phraser/phraser.dat")
+#phraser.train(data_iterator, min_count=MIN_COUNT)
+#phraser.save_phrases(filename="/home/wish/Private/other/stwe/models/phraser/phraser.dat")
 
 # If Phraser is already trained
-#phraser.load_phrases("/tmp/phraser.dat")
+phraser.load_phrases("/home/wish/Private/other/stwe/models/phraser/phraser.dat")
 
 # Set the phraser for data_iterator
 data_iterator.preprocessing_tokens = phraser.get_phrases
 
-emb = Word2Vec(save_folder='/home/wish/Private/other/stwe/models/emb/w2v/', min_count=MIN_COUNT, workers=8)
-#emb = FastText(save_folder='/home/wish/Private/other/stwe/models/emb/ft/', min_count=MIN_COUNT)
+#emb = Word2Vec(save_folder='/home/wish/Private/other/stwe/models/emb/w2v/', min_count=MIN_COUNT, workers=8)
+emb = FastText(save_folder='/home/wish/Private/other/stwe/models/emb/ft/', min_count=MIN_COUNT)
 
 emb.init_train(data_iterator=data_iterator)
-
+emb.save()
 
 # Test
 emb.emb.wv.most_similar("open")
