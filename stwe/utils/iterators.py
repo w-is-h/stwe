@@ -71,7 +71,7 @@ class TimeWordsIteratorTUW(object):
                 if self.select_probability == 1 or random.random() < self.select_probability:
                     # We get the text/time from a file in TUW format (Time\tUser\tWords)
                     tmp = line.split("\t")
-                    time = int(float(tmp[0]))
+                    time = float(tmp[0])
                     text = tmp[2]
 
                     if self.preprocessing_text is not None:

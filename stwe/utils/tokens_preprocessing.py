@@ -1,6 +1,9 @@
 import numpy as np
 
 class TokensPreprocessing(object):
+    """ This class is an iterator over the dataset, with the
+    option to do subsampling of frequent tokens.
+    """
     def __init__(self, embedding, data_iterator, subsample=1e-3):
         self.embedding = embedding
         self.data_iterator = data_iterator
@@ -39,13 +42,11 @@ class TokensPreprocessing(object):
         IN: ['i', 'was', 'never', 'a', 'snake']
         OUT: [1, 2, 4]
         """
-        print(sum(self.word_freq))
         out = []
         for token in tokens:
             if token in self.vocab:
                 if self.word_prob[self.vocab[token].index] > np.random.rand():
                     out.append(self.vocab[token].index)
-                print(self.word_prob[self.vocab[token].index])
 
         return out
 
