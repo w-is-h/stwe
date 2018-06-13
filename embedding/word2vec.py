@@ -46,7 +46,8 @@ class Word2Vec(Embedding):
 
     def __getitem__(self, word):
         if word in self.emb.wv.vocab:
-            return unitvec(self.emb.wv.syn0[self.emb.wv.vocab[word].index])
+            #return unitvec(self.emb.wv.syn0[self.emb.wv.vocab[word].index])
+            return self.emb.wv.get_vector(word)
         else:
             return None
 
