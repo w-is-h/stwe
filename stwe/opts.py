@@ -6,15 +6,15 @@ class OptionsSTWE(object):
 
         # Where to write out summaries - tensorboard logs.
         self.model_path = "../models/stwe/"
-        self.logs_path = os.path.join(self.model_save_path, "logs")
+        #self.logs_path = os.path.join(self.model_save_path, "logs")
 
         # Make the directories if they don't exist
-        os.makedirs(self.model_path, exist_ok=True)
-        os.makedirs(self.logs_path, exist_ok=True)
+        #os.makedirs(self.model_path, exist_ok=True)
+        #os.makedirs(self.logs_path, exist_ok=True)
 
         # Minimum count for words in the data, all words with frequency bellow
         #this will be removed
-        self.min_count = 50
+        self.min_count = 20
 
         # Number of clusters to train
         self.nclst = 200
@@ -50,16 +50,16 @@ class OptionsSTWE(object):
         self.epoch_size = 100000
 
         # The number of words to predict to the left and right of the target word.
-        self.window_size = 20
+        self.window_size = 6
 
         # Given one sample the maximum number of words (a, b) to take.
-        self.max_pairs_from_sample = 100
+        self.max_pairs_from_sample = 200
 
         # Maximum number of (a, b) pairs from one sample, where the target 'b' is the same word
         self.max_same_target = 10
 
         # Subsampling threshold for word occurrence.
-        self.subsample = 1e-3
+        self.subsample = 1e-4
 
         # Seed
         self.seed = 3
@@ -82,9 +82,9 @@ class OptionsSTWE(object):
         #self.test_data = "../data/test.txt"
 
         # Timestamp for the first and last document (training data)
-        #self.start_time = 536454000
+        self.start_time = 536454000
         #self._start_time = 536454000
-        #self.end_time = 1041375600
+        self.end_time = 1041375600
         #self._end_time = 1041375600
         #self.time_transform = 50000000
 
