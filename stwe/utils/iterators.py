@@ -33,8 +33,8 @@ class EmbIteratorTUW(object):
                 tokens = self.tokenizer(text)
                 if self.preprocessing_tokens is not None:
                     tokens = self.preprocessing_tokens(tokens)
-
-                yield tokens
+                if len(tokens) > 6:
+                    yield tokens
 
 
 class TimeWordsIteratorTUW(object):
@@ -84,7 +84,8 @@ class TimeWordsIteratorTUW(object):
                     if self.preprocessing_tokens is not None:
                         tokens = self.preprocessing_tokens(tokens)
 
-                    yield (time, tokens)
+                    if len(tokens) > 6:
+                        yield (time, tokens)
 
     def __len__(self):
         if self._length is None:

@@ -51,7 +51,7 @@ class TimeTransform(object):
 
         if self.normalize:
             end = self.end_time - self.start_time
-            return (0, end // time_unit)
+            return (0, end // self.time_unit)
         else:
             return (self.start_time // self.time_unit,
                     self.end_time // self.time_unit)
